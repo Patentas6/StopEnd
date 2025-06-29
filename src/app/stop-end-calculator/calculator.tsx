@@ -7,7 +7,16 @@ import { createClient } from "@/lib/supabase/client";
 import { v4 as uuidv4 } from "uuid";
 import { addDays, differenceInDays, format, getDay, startOfDay, parseISO } from "date-fns";
 import { toast } from "sonner";
-import type { PanelHandle } from "react-resizable-panels";
+
+// Manually define the PanelHandle type as a workaround for the persistent import issue.
+interface PanelHandle {
+  collapse: () => void;
+  expand: () => void;
+  isCollapsed: () => boolean;
+  isExpanded: () => boolean;
+  resize: (percentage: number) => void;
+  getSize: () => number;
+}
 
 import { ProductionPlanOption, ProductionRestriction, DailyOperation, SimulationLogEntry, SimulationSummary, FirstShortageInfo } from "@/types/stop-end-calculator";
 import { calculateOptimalProductionPlan, runFullSimulation } from "@/lib/stop-end-calculator-logic";
