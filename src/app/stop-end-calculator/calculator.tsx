@@ -16,6 +16,7 @@ interface PanelHandle {
   isExpanded: () => boolean;
   resize: (percentage: number) => void;
   getSize: () => number;
+  getId: () => string;
 }
 
 import { ProductionPlanOption, ProductionRestriction, DailyOperation, SimulationLogEntry, SimulationSummary, FirstShortageInfo } from "@/types/stop-end-calculator";
