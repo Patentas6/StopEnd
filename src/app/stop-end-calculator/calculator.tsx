@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { v4 as uuidv4 } from "uuid";
 import { addDays, differenceInDays, format, getDay, startOfDay, parseISO } from "date-fns";
 import { toast } from "sonner";
-import type { PanelRef } from "react-resizable-panels";
+import type { PanelHandle } from "react-resizable-panels";
 
 import { ProductionPlanOption, ProductionRestriction, DailyOperation, SimulationLogEntry, SimulationSummary, FirstShortageInfo } from "@/types/stop-end-calculator";
 import { calculateOptimalProductionPlan, runFullSimulation } from "@/lib/stop-end-calculator-logic";
@@ -37,7 +37,7 @@ interface CalculatorProps {
 export default function Calculator({ user }: CalculatorProps) {
   const supabase = createClient();
   const router = useRouter();
-  const sidebarPanelRef = useRef<PanelRef>(null);
+  const sidebarPanelRef = useRef<PanelHandle>(null);
 
   // Main state for calculator inputs
   const [projectName, setProjectName] = useState("New Project");
