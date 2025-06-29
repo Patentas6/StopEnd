@@ -1,4 +1,5 @@
 "use client";
+// Forcing a new commit to trigger Vercel deployment
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import type { User } from "@supabase/supabase-js";
