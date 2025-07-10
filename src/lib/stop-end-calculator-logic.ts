@@ -247,6 +247,60 @@ function runDetailedInternalSimulation(
   };
 }
 
+function runStockTieBreakers(
+  simResult: DetailedInternalSimulationResult,
+  bestSimResult: DetailedInternalSimulationResult,
+  currentGlobalStock10m: number,
+  currentGlobalStock6m: number
+): boolean {
+    const candStock10mAfterDD = simResult.stock10mAfterDecisionDayInstall;
+    const candStock6mAfterDD = simResult.stock6mAfterDecisionDayInstall;
+    const bestStock10mAfterDD = bestSimResult.stock10mAfterDecisionDayInstall;
+    const bestStock6mAfterDD = bestSimResult.stock6mAfterDecisionDayInstall;
+
+    // 1. Strongly avoid zero stock
+    const candHasZeroStock = candStock10mAfterDD === 0 || candStock6mAfterDD === 0;
+    const bestHasZeroStock = bestStock10mAfterDD === 0 || bestStock6mAfterDD === 0;
+
+    if (bestHasZeroStock && !candHasZeroStock) return true;
+    if (!bestHasZeroStock && candHasZeroStock) return false;
+
+    // 2. Maximize minimum stock
+    const candMinStock = Math.min(candStock10mAfterDD, candStock6mAfterDD);
+    const bestMinStock = Math.min(bestStock10mAfterDD, bestStock6mAfterDD);
+
+    if (candMinStock > bestMinStock) return true;
+    if (candMinStock < bestMinStock) return false;
+
+    // 3. Maximize total stock
+    const candTotalStock = candStock10mAfterDD + candStock6mAfterDD;
+    const bestTotalStock = bestStock10mAfterDD + bestStock6mAfterDD;
+
+    if (candTotalStock > bestTotalStock) return true;
+    if (candTotalStock < bestTotalStock) return false;
+
+    // 4. Address global scarcity
+    const candProd10 = simResult.decisionDayProduces10m;
+    const candProd6 = simResult.decisionDayProduces6m;
+    const bestProd10 = bestSimResult.decisionDayProduces10m;
+    const bestProd6 = bestSimResult.decisionDayProduces6m;
+
+    if (currentGlobalStock10m < currentGlobalStock6m) { // 10m is scarcer globally
+        if (candProd10 > bestProd10) return true;
+        if (candProd10 === bestProd10 && candProd6 > bestProd6) return true;
+    } else if (currentGlobalStock6m < currentGlobalStock10m) { // 6m is scarcer globally
+        if (candProd6 > bestProd6) return true;
+        if (candProd6 === bestProd6 && candProd10 > bestProd10) return true;
+    } else { // Stocks were equal globally, prefer plan that produces more overall, then more 10m
+        if (candProd10 + candProd6 > bestProd10 + bestProd6) return true;
+        if (candProd10 + candProd6 === bestProd10 + bestProd6) {
+            if (candProd10 > bestProd10) return true;
+        }
+    }
+
+    return false;
+}
+
 
 export function calculateOptimalProductionPlan(
   baseOperations: DailyOperation[],
@@ -255,7 +309,8 @@ export function calculateOptimalProductionPlan(
   initialStock10m: number,
   initialStock6m: number,
   target10mNeeded: number,
-  target6mNeeded: number
+  target6mNeeded: number,
+  optimizationStrategy: 'performance' | 'consistency' = 'performance'
 ): { optimalPlan: DailyOperation[]; } {
 
   const optimalPlanResult: DailyOperation[] = baseOperations.map(op => ({ ...op }));
@@ -267,6 +322,7 @@ export function calculateOptimalProductionPlan(
   for (let i = 0; i < optimalPlanResult.length; i++) {
     const decisionDay = optimalPlanResult[i];
     const decisionDayDate = decisionDay.actualDate;
+    const previousDayPlanId = i > 0 ? optimalPlanResult[i - 1].chosenProductionPlanId : undefined;
 
     const isManuallyOverridden = decisionDay.chosenProductionPlanId === undefined &&
                                  (decisionDay.produced10m > 0 || decisionDay.produced6m > 0);
@@ -342,55 +398,27 @@ export function calculateOptimalProductionPlan(
                     else if (simResult.futureTotalShortage10m === bestSimResult.futureTotalShortage10m) {
                       if (simResult.futureTotalShortage6m < bestSimResult.futureTotalShortage6m) candidateIsBetter = true;
                       else if (simResult.futureTotalShortage6m === bestSimResult.futureTotalShortage6m) {
-                        // All shortage metrics are equal, now apply stock-based tie-breakers
-                        const candStock10mAfterDD = simResult.stock10mAfterDecisionDayInstall;
-                        const candStock6mAfterDD = simResult.stock6mAfterDecisionDayInstall;
-                        const bestStock10mAfterDD = bestSimResult.stock10mAfterDecisionDayInstall;
-                        const bestStock6mAfterDD = bestSimResult.stock6mAfterDecisionDayInstall;
+                        // All shortage metrics are equal. Time for tie-breakers.
+                        
+                        // Consistency Tie-Breaker
+                        if (optimizationStrategy === 'consistency' && previousDayPlanId) {
+                            const candidatePlanId = candidatePlan?.id;
+                            const bestPlanId = bestPlanForDecisionDay?.id;
 
-                        // 1. Strongly avoid zero stock
-                        const candHasZeroStock = candStock10mAfterDD === 0 || candStock6mAfterDD === 0;
-                        const bestHasZeroStock = bestStock10mAfterDD === 0 || bestStock6mAfterDD === 0;
+                            const candidateMatchesPrevious = !!candidatePlanId && candidatePlanId === previousDayPlanId;
+                            const bestMatchesPrevious = !!bestPlanId && bestPlanId === previousDayPlanId;
 
-                        if (bestHasZeroStock && !candHasZeroStock) {
-                            candidateIsBetter = true;
-                        } else if (!bestHasZeroStock && candHasZeroStock) {
-                            candidateIsBetter = false; // Current best is already better
-                        } else { // Either both have zero stock, or neither does. Proceed to next tie-breaker.
-                            // 2. Maximize minimum stock
-                            const candMinStock = Math.min(candStock10mAfterDD, candStock6mAfterDD);
-                            const bestMinStock = Math.min(bestStock10mAfterDD, bestStock6mAfterDD);
-
-                            if (candMinStock > bestMinStock) {
+                            if (candidateMatchesPrevious && !bestMatchesPrevious) {
                                 candidateIsBetter = true;
-                            } else if (candMinStock === bestMinStock) {
-                                // 3. Maximize total stock
-                                const candTotalStock = candStock10mAfterDD + candStock6mAfterDD;
-                                const bestTotalStock = bestStock10mAfterDD + bestStock6mAfterDD;
-
-                                if (candTotalStock > bestTotalStock) {
-                                    candidateIsBetter = true;
-                                } else if (candTotalStock === bestTotalStock) {
-                                    // 4. Address global scarcity (prefer producing the item that was lower before today's production)
-                                    const candProd10 = simResult.decisionDayProduces10m;
-                                    const candProd6 = simResult.decisionDayProduces6m;
-                                    const bestProd10 = bestSimResult.decisionDayProduces10m;
-                                    const bestProd6 = bestSimResult.decisionDayProduces6m;
-
-                                    if (currentGlobalStock10m < currentGlobalStock6m) { // 10m is scarcer globally
-                                        if (candProd10 > bestProd10) candidateIsBetter = true;
-                                        else if (candProd10 === bestProd10 && candProd6 > bestProd6) candidateIsBetter = true; // Secondary: produce more of other if primary is same
-                                    } else if (currentGlobalStock6m < currentGlobalStock10m) { // 6m is scarcer globally
-                                        if (candProd6 > bestProd6) candidateIsBetter = true;
-                                        else if (candProd6 === bestProd6 && candProd10 > bestProd10) candidateIsBetter = true;
-                                    } else { // Stocks were equal globally, prefer plan that produces more overall, then more 10m
-                                        if (candProd10 + candProd6 > bestProd10 + bestProd6) candidateIsBetter = true;
-                                        else if (candProd10 + candProd6 === bestProd10 + bestProd6) {
-                                            if (candProd10 > bestProd10) candidateIsBetter = true;
-                                        }
-                                    }
-                                }
+                            } else if (!candidateMatchesPrevious && bestMatchesPrevious) {
+                                candidateIsBetter = false; // Current best is already better
+                            } else {
+                                // Both match or both don't match, proceed to stock tie-breakers
+                                candidateIsBetter = runStockTieBreakers(simResult, bestSimResult, currentGlobalStock10m, currentGlobalStock6m);
                             }
+                        } else {
+                            // Performance mode or first day, proceed to stock tie-breakers
+                            candidateIsBetter = runStockTieBreakers(simResult, bestSimResult, currentGlobalStock10m, currentGlobalStock6m);
                         }
                       }
                     }

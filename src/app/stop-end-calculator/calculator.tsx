@@ -31,6 +31,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Switch } from "@/components/ui/switch";
 import { CalendarIcon, ChevronsRight, Loader2, Save, Play, PanelLeftClose, PanelLeftOpen, LogOut, BarChart, List } from "lucide-react";
 import ProductionPlanEditor from "@/components/stop-end-calculator/production-plan-editor";
 import ProductionRestrictionEditor from "@/components/stop-end-calculator/production-restriction-editor";
@@ -80,6 +81,7 @@ export default function Calculator({ user }: CalculatorProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [savedStateId, setSavedStateId] = useState<string | null>(null);
   const [isResultsVisible, setIsResultsVisible] = useState(false);
+  const [optimizationStrategy, setOptimizationStrategy] = useState<'performance' | 'consistency'>('performance');
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -207,7 +209,8 @@ export default function Calculator({ user }: CalculatorProps) {
           initialStock10m,
           initialStock6m,
           target10mNeeded,
-          target6mNeeded
+          target6mNeeded,
+          optimizationStrategy
         );
         setDailyOperations(optimalPlan);
 
@@ -232,7 +235,7 @@ export default function Calculator({ user }: CalculatorProps) {
         setIsSimulating(false);
       }
     }, 50);
-  }, [dailyOperations, productionPlanOptions, productionRestrictions, initialStock10m, initialStock6m, target10mNeeded, target6mNeeded]);
+  }, [dailyOperations, productionPlanOptions, productionRestrictions, initialStock10m, initialStock6m, target10mNeeded, target6mNeeded, optimizationStrategy]);
 
   const handleSaveState = async () => {
     setIsSaving(true);
@@ -362,6 +365,27 @@ export default function Calculator({ user }: CalculatorProps) {
                                 <div className="space-y-1">
                                     <Label>Initial Stock 6m</Label>
                                     <Input type="number" value={initialStock6m} onChange={(e) => setInitialStock6m(parseInt(e.target.value) || 0)} min="0" />
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Calculation Settings</CardTitle>
+                                <CardDescription>Fine-tune the optimization logic.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="flex items-center justify-between rounded-lg border p-4">
+                                    <div className="space-y-0.5">
+                                        <Label htmlFor="optimization-strategy" className="text-base">Prioritize Production Consistency</Label>
+                                        <p className="text-[0.8rem] text-muted-foreground">
+                                            Reduces frequent changes in production methods. May result in a less optimal stock level.
+                                        </p>
+                                    </div>
+                                    <Switch
+                                        id="optimization-strategy"
+                                        checked={optimizationStrategy === 'consistency'}
+                                        onCheckedChange={(checked) => setOptimizationStrategy(checked ? 'consistency' : 'performance')}
+                                    />
                                 </div>
                             </CardContent>
                         </Card>
