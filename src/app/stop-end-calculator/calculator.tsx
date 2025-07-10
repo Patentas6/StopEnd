@@ -32,12 +32,13 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
-import { CalendarIcon, ChevronsRight, Loader2, Save, Play, PanelLeftClose, PanelLeftOpen, LogOut, BarChart, List } from "lucide-react";
+import { CalendarIcon, ChevronsRight, Loader2, Save, Play, PanelLeftClose, PanelLeftOpen, LogOut, BarChart, List, Printer } from "lucide-react";
 import ProductionPlanEditor from "@/components/stop-end-calculator/production-plan-editor";
 import ProductionRestrictionEditor from "@/components/stop-end-calculator/production-restriction-editor";
 import InstallationBlackoutEditor from "@/components/stop-end-calculator/installation-blackout-editor";
 import DailyOperationCard from "@/components/stop-end-calculator/daily-operation-card";
 import SimulationResultsDisplay from "@/components/stop-end-calculator/simulation-results-display";
+import PrintablePlan from "@/components/stop-end-calculator/printable-plan";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 
@@ -83,6 +84,7 @@ export default function Calculator({ user }: CalculatorProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [savedStateId, setSavedStateId] = useState<string | null>(null);
   const [isResultsVisible, setIsResultsVisible] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
   const [optimizationStrategy, setOptimizationStrategy] = useState<'performance' | 'consistency'>('performance');
 
   const handleLogout = async () => {
@@ -288,6 +290,19 @@ export default function Calculator({ user }: CalculatorProps) {
     );
   }
 
+  if (isPrinting) {
+    return (
+      <PrintablePlan
+        dailyPlan={simulationResults || dailyOperations}
+        productionPlans={productionPlanOptions}
+        initialStock10m={initialStock10m}
+        initialStock6m={initialStock6m}
+        projectName={projectName}
+        onBack={() => setIsPrinting(false)}
+      />
+    );
+  }
+
   return (
     <div className="h-screen w-screen flex flex-col">
         <header className="flex items-center justify-between p-2 border-b bg-background">
@@ -415,10 +430,15 @@ export default function Calculator({ user }: CalculatorProps) {
                             Calculate Optimal Plan & Run Simulation
                         </Button>
                         {simulationResults && (
-                            <Button variant="outline" onClick={() => setIsResultsVisible(!isResultsVisible)}>
-                                {isResultsVisible ? <List className="mr-2 h-4 w-4" /> : <BarChart className="mr-2 h-4 w-4" />}
-                                {isResultsVisible ? "View Plan" : "View Simulation Results"}
-                            </Button>
+                            <>
+                                <Button variant="outline" onClick={() => setIsResultsVisible(!isResultsVisible)}>
+                                    {isResultsVisible ? <List className="mr-2 h-4 w-4" /> : <BarChart className="mr-2 h-4 w-4" />}
+                                    {isResultsVisible ? "View Plan" : "View Simulation Results"}
+                                </Button>
+                                <Button variant="outline" onClick={() => setIsPrinting(true)}>
+                                    <Printer className="mr-2 h-4 w-4" /> Print Plan
+                                </Button>
+                            </>
                         )}
                     </div>
                     <ScrollArea className="flex-grow p-4 bg-muted/40">

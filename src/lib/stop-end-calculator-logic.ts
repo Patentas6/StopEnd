@@ -570,6 +570,11 @@ export function runFullSimulation(
       shortage10m,
       shortage6m,
     });
+
+    // Check if both targets have been met or exceeded
+    if (totalActualInstalled10m >= target10mNeeded && totalActualInstalled6m >= target6mNeeded) {
+      break; // Stop the simulation
+    }
   }
 
   const targetShortfall10m = Math.max(0, target10mNeeded - totalActualInstalled10m);
