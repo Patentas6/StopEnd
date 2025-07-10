@@ -258,52 +258,60 @@ function runStockTieBreakers(
   currentGlobalStock10m: number,
   currentGlobalStock6m: number
 ): boolean {
+    // Emergency Production Heuristic: If one stock is at/below buffer and the other is not,
+    // we must prioritize producing the low-stock item.
+    const stock10mIsLow = currentGlobalStock10m <= STOCK_BUFFER;
+    const stock6mIsLow = currentGlobalStock6m <= STOCK_BUFFER;
+
+    // Case 1: Only 10m stock is low.
+    if (stock10mIsLow && !stock6mIsLow) {
+        // A plan that produces more 10m is better.
+        if (simResult.decisionDayProduces10m > bestSimResult.decisionDayProduces10m) return true;
+        if (simResult.decisionDayProduces10m < bestSimResult.decisionDayProduces10m) return false;
+        // If 10m production is equal, prefer the one that produces less 6m to focus resources.
+        if (simResult.decisionDayProduces6m < bestSimResult.decisionDayProduces6m) return true;
+        if (simResult.decisionDayProduces6m > bestSimResult.decisionDayProduces6m) return false;
+    }
+
+    // Case 2: Only 6m stock is low.
+    if (stock6mIsLow && !stock10mIsLow) {
+        // A plan that produces more 6m is better.
+        if (simResult.decisionDayProduces6m > bestSimResult.decisionDayProduces6m) return true;
+        if (simResult.decisionDayProduces6m < bestSimResult.decisionDayProduces6m) return false;
+        // If 6m production is equal, prefer the one that produces less 10m to focus resources.
+        if (simResult.decisionDayProduces10m < bestSimResult.decisionDayProduces10m) return true;
+        if (simResult.decisionDayProduces10m > bestSimResult.decisionDayProduces10m) return false;
+    }
+
+    // If we reach here, it means either both stocks are low/critical, or neither are.
+    // In this situation, we fall back to the standard tie-breakers to ensure overall health.
     const candStock10mAfterDD = simResult.stock10mAfterDecisionDayInstall;
     const candStock6mAfterDD = simResult.stock6mAfterDecisionDayInstall;
     const bestStock10mAfterDD = bestSimResult.stock10mAfterDecisionDayInstall;
     const bestStock6mAfterDD = bestSimResult.stock6mAfterDecisionDayInstall;
 
-    // 1. Strongly avoid dipping into buffer
+    // Standard Tie-Breaker 1: Strongly avoid dipping into buffer post-installation.
     const candDipsIntoBuffer = candStock10mAfterDD < STOCK_BUFFER || candStock6mAfterDD < STOCK_BUFFER;
     const bestDipsIntoBuffer = bestStock10mAfterDD < STOCK_BUFFER || bestStock6mAfterDD < STOCK_BUFFER;
 
     if (bestDipsIntoBuffer && !candDipsIntoBuffer) return true;
     if (!bestDipsIntoBuffer && candDipsIntoBuffer) return false;
 
-    // 2. Maximize minimum stock
+    // Standard Tie-Breaker 2: Maximize the minimum stock level.
     const candMinStock = Math.min(candStock10mAfterDD, candStock6mAfterDD);
     const bestMinStock = Math.min(bestStock10mAfterDD, bestStock6mAfterDD);
 
     if (candMinStock > bestMinStock) return true;
     if (candMinStock < bestMinStock) return false;
 
-    // 3. Maximize total stock
+    // Standard Tie-Breaker 3: Maximize the total combined stock.
     const candTotalStock = candStock10mAfterDD + candStock6mAfterDD;
     const bestTotalStock = bestStock10mAfterDD + bestStock6mAfterDD;
 
     if (candTotalStock > bestTotalStock) return true;
     if (candTotalStock < bestTotalStock) return false;
 
-    // 4. Address global scarcity
-    const candProd10 = simResult.decisionDayProduces10m;
-    const candProd6 = simResult.decisionDayProduces6m;
-    const bestProd10 = bestSimResult.decisionDayProduces10m;
-    const bestProd6 = bestSimResult.decisionDayProduces6m;
-
-    if (currentGlobalStock10m < currentGlobalStock6m) { // 10m is scarcer globally
-        if (candProd10 > bestProd10) return true;
-        if (candProd10 === bestProd10 && candProd6 > bestProd6) return true;
-    } else if (currentGlobalStock6m < currentGlobalStock10m) { // 6m is scarcer globally
-        if (candProd6 > bestProd6) return true;
-        if (candProd6 === bestProd6 && candProd10 > bestProd10) return true;
-    } else { // Stocks were equal globally, prefer plan that produces more overall, then more 10m
-        if (candProd10 + candProd6 > bestProd10 + bestProd6) return true;
-        if (candProd10 + candProd6 === bestProd10 + bestProd6) {
-            if (candProd10 > bestProd10) return true;
-        }
-    }
-
-    return false;
+    return false; // All else being equal, the existing plan is fine.
 }
 
 

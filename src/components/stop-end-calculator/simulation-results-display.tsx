@@ -86,6 +86,7 @@ export default function SimulationResultsDisplay({
                 <TableRow>
                   <TableHead className="whitespace-nowrap">Day</TableHead>
                   <TableHead className="whitespace-nowrap">Date</TableHead>
+                  <TableHead className="text-center whitespace-nowrap">Daily Prod (10m/6m)</TableHead>
                   <TableHead className="text-center whitespace-nowrap">Total Prod (10m/6m)</TableHead>
                   <TableHead className="text-center whitespace-nowrap">Closing Stock (10m/6m)</TableHead>
                   <TableHead className="text-center whitespace-nowrap">Total Inst (10m/6m)</TableHead>
@@ -97,6 +98,7 @@ export default function SimulationResultsDisplay({
                   <TableRow key={log.id} className={cn((log.shortage10m > 0 || log.shortage6m > 0) && "bg-red-50 dark:bg-red-900/30")}>
                     <TableCell className="whitespace-nowrap">{log.projectDayNumber} ({log.dayOfWeek})</TableCell>
                     <TableCell className="whitespace-nowrap">{format(log.actualDate, "MMM d")}</TableCell>
+                    <TableCell className="text-center">{log.produced10m} / {log.produced6m}</TableCell>
                     <TableCell className="text-center">{log.cumulativeProduced10m} / {log.cumulativeProduced6m}</TableCell>
                     <TableCell className="text-center">{log.closingStock10m} / {log.closingStock6m}</TableCell>
                     <TableCell className="text-center">{log.cumulativeInstalled10m} / {log.cumulativeInstalled6m}</TableCell>
