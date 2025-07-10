@@ -9,6 +9,8 @@ import {
   FirstShortageInfo,
 } from "@/types/stop-end-calculator";
 
+const STOCK_BUFFER = 4; // Safety stock buffer
+
 // Helper to check if production of a specific item type is restricted on a given date
 export function isProductionRestricted(
   itemType: "10m" | "6m",
@@ -26,19 +28,22 @@ export function isProductionRestricted(
   return false;
 }
 
-// Helper to calculate actual sets installed based on requests and stock
+// Helper to calculate actual sets installed based on requests and available stock (respecting the buffer)
 function calculateActualSetInstallations(
     requested10m: number,
     requested6m: number,
     stock10m: number,
     stock6m: number
 ): { actualInstalled10m: number; actualInstalled6m: number; setsInstalled: number } {
+    const availableStock10m = Math.max(0, stock10m - STOCK_BUFFER);
+    const availableStock6m = Math.max(0, stock6m - STOCK_BUFFER);
+
     const desiredSetsBasedOn10mRequest = requested10m;
     const desiredSetsBasedOn6mRequest = requested6m;
     const maxPossibleSetsFromRequest = Math.min(desiredSetsBasedOn10mRequest, desiredSetsBasedOn6mRequest);
 
-    const maxPossibleSetsFromStock10m = stock10m;
-    const maxPossibleSetsFromStock6m = stock6m;
+    const maxPossibleSetsFromStock10m = availableStock10m;
+    const maxPossibleSetsFromStock6m = availableStock6m;
     const maxPossibleSetsFromStock = Math.min(maxPossibleSetsFromStock10m, maxPossibleSetsFromStock6m);
 
     const setsInstalled = Math.min(maxPossibleSetsFromRequest, maxPossibleSetsFromStock);
@@ -258,12 +263,12 @@ function runStockTieBreakers(
     const bestStock10mAfterDD = bestSimResult.stock10mAfterDecisionDayInstall;
     const bestStock6mAfterDD = bestSimResult.stock6mAfterDecisionDayInstall;
 
-    // 1. Strongly avoid zero stock
-    const candHasZeroStock = candStock10mAfterDD === 0 || candStock6mAfterDD === 0;
-    const bestHasZeroStock = bestStock10mAfterDD === 0 || bestStock6mAfterDD === 0;
+    // 1. Strongly avoid dipping into buffer
+    const candDipsIntoBuffer = candStock10mAfterDD < STOCK_BUFFER || candStock6mAfterDD < STOCK_BUFFER;
+    const bestDipsIntoBuffer = bestStock10mAfterDD < STOCK_BUFFER || bestStock6mAfterDD < STOCK_BUFFER;
 
-    if (bestHasZeroStock && !candHasZeroStock) return true;
-    if (!bestHasZeroStock && candHasZeroStock) return false;
+    if (bestDipsIntoBuffer && !candDipsIntoBuffer) return true;
+    if (!bestDipsIntoBuffer && candDipsIntoBuffer) return false;
 
     // 2. Maximize minimum stock
     const candMinStock = Math.min(candStock10mAfterDD, candStock6mAfterDD);
