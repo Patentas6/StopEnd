@@ -31,7 +31,13 @@ export default function PrintablePlan({
   const getPlanName = (op: DailyOperation) => {
     if (op.isSunday) return "No Production";
     const plan = productionPlans.find(p => p.id === op.chosenProductionPlanId);
-    if (plan) return plan.name;
+    if (plan) {
+        // If the plan was chosen but production was capped to meet the target
+        if (plan.produces10m !== op.produced10m || plan.produces6m !== op.produced6m) {
+            return `${plan.name} (Adjusted to ${op.produced10m}/${op.produced6m})`;
+        }
+        return plan.name;
+    }
     if (op.produced10m > 0 || op.produced6m > 0) {
       return `Manual: ${op.produced10m} / ${op.produced6m}`;
     }

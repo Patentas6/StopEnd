@@ -18,12 +18,15 @@ interface DailyOperationCardProps {
 export default function DailyOperationCard({ operation, productionPlans, onChange }: DailyOperationCardProps) {
   const chosenPlan = productionPlans.find(p => p.id === operation.chosenProductionPlanId);
   
-  // Determine if the current production values match any plan, or if it's a manual/custom input
   let planDisplayString = "No Production";
   if (operation.isSunday || (productionPlans.length === 0 && !operation.produced10m && !operation.produced6m)) {
     planDisplayString = "No Production";
   } else if (chosenPlan) {
-    planDisplayString = chosenPlan.name;
+    if (chosenPlan.produces10m !== operation.produced10m || chosenPlan.produces6m !== operation.produced6m) {
+        planDisplayString = `${chosenPlan.name} (Adjusted)`;
+    } else {
+        planDisplayString = chosenPlan.name;
+    }
   } else if (operation.produced10m > 0 || operation.produced6m > 0) {
     planDisplayString = "Manual Input";
   }
@@ -60,14 +63,15 @@ export default function DailyOperationCard({ operation, productionPlans, onChang
       <CardContent className="space-y-2 text-sm flex-grow">
         <div>
           <Label className="text-xs">Chosen Plan:</Label>
-          {chosenPlan && planDisplayString !== "Manual Input" ? (
+          {chosenPlan ? (
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <p className="truncate font-medium cursor-default">{planDisplayString}</p>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>10m: {chosenPlan.produces10m}, 6m: {chosenPlan.produces6m}</p>
+                  <p>Original Plan: {chosenPlan.produces10m} / {chosenPlan.produces6m}</p>
+                  {planDisplayString.includes("Adjusted") && <p>Actual Prod: {operation.produced10m} / {operation.produced6m}</p>}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>

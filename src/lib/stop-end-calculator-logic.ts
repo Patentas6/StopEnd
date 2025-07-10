@@ -462,11 +462,9 @@ export function calculateOptimalProductionPlan(
 
         if (finalProd10m > 0 && finalProd10m > remaining10mNeeded) {
             finalProd10m = remaining10mNeeded;
-            planId = undefined; // Custom production amount
         }
         if (finalProd6m > 0 && finalProd6m > remaining6mNeeded) {
             finalProd6m = remaining6mNeeded;
-            planId = undefined; // Custom production amount
         }
 
         decisionDay.produced10m = finalProd10m;
