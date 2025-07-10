@@ -455,7 +455,7 @@ export function calculateOptimalProductionPlan(
       if (bestSimResult) {
         let finalProd10m = bestSimResult.decisionDayProduces10m;
         let finalProd6m = bestSimResult.decisionDayProduces6m;
-        let planId = bestSimResult.decisionDayChosenPlanId;
+        const planId = bestSimResult.decisionDayChosenPlanId;
 
         const remaining10mNeeded = Math.max(0, target10mNeeded - (initialStock10m + totalProduced10m));
         const remaining6mNeeded = Math.max(0, target6mNeeded - (initialStock6m + totalProduced6m));
