@@ -26,6 +26,13 @@ export interface ProductionRestriction {
   reason?: string; // Optional: for user reference
 }
 
+export interface InstallationBlackout {
+  id: string;
+  unavailableFrom: Date;
+  unavailableTo: Date;
+  reason?: string;
+}
+
 export interface SimulationLogEntry extends DailyOperation {
   openingStock10m: number;
   openingStock6m: number;
@@ -66,7 +73,8 @@ export interface AppState {
   target10mNeeded: number;
   target6mNeeded: number;
   productionPlanOptions: ProductionPlanOption[];
-  productionRestrictions: ProductionRestriction[]; // Added
+  productionRestrictions: ProductionRestriction[];
+  installationBlackouts: InstallationBlackout[];
   dailyOperations: DailyOperation[];
   simulationResults: SimulationLogEntry[];
   simulationSummary: SimulationSummary | null;

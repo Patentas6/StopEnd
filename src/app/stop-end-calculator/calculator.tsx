@@ -5,7 +5,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { v4 as uuidv4 } from "uuid";
-import { addDays, differenceInDays, format, getDay, startOfDay, parseISO } from "date-fns";
+import { addDays, differenceInDays, format, getDay, startOfDay, parseISO, isWithinInterval } from "date-fns";
 import { toast } from "sonner";
 
 // Manually define the PanelHandle type as a workaround for the persistent import issue.
@@ -19,7 +19,7 @@ interface PanelHandle {
   getId: () => string;
 }
 
-import { ProductionPlanOption, ProductionRestriction, DailyOperation, SimulationLogEntry, SimulationSummary, FirstShortageInfo } from "@/types/stop-end-calculator";
+import { ProductionPlanOption, ProductionRestriction, DailyOperation, SimulationLogEntry, SimulationSummary, FirstShortageInfo, InstallationBlackout } from "@/types/stop-end-calculator";
 import { calculateOptimalProductionPlan, runFullSimulation } from "@/lib/stop-end-calculator-logic";
 
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,7 @@ import { Switch } from "@/components/ui/switch";
 import { CalendarIcon, ChevronsRight, Loader2, Save, Play, PanelLeftClose, PanelLeftOpen, LogOut, BarChart, List } from "lucide-react";
 import ProductionPlanEditor from "@/components/stop-end-calculator/production-plan-editor";
 import ProductionRestrictionEditor from "@/components/stop-end-calculator/production-restriction-editor";
+import InstallationBlackoutEditor from "@/components/stop-end-calculator/installation-blackout-editor";
 import DailyOperationCard from "@/components/stop-end-calculator/daily-operation-card";
 import SimulationResultsDisplay from "@/components/stop-end-calculator/simulation-results-display";
 import { cn } from "@/lib/utils";
@@ -67,6 +68,7 @@ export default function Calculator({ user }: CalculatorProps) {
     { id: uuidv4(), name: "Focus 10m", produces10m: 3, produces6m: 0 },
   ]);
   const [productionRestrictions, setProductionRestrictions] = useState<ProductionRestriction[]>([]);
+  const [installationBlackouts, setInstallationBlackouts] = useState<InstallationBlackout[]>([]);
   
   // State for derived data and simulation results
   const [dailyOperations, setDailyOperations] = useState<DailyOperation[]>([]);
@@ -126,6 +128,7 @@ export default function Calculator({ user }: CalculatorProps) {
         setTarget6mNeeded(saved.target_6m_needed);
         setProductionPlanOptions(saved.production_plan_options || []);
         setProductionRestrictions(saved.production_restrictions || []);
+        setInstallationBlackouts(saved.installation_blackouts || []);
         setSavedStateId(saved.id);
         toast.success("Loaded your most recent project.");
       }
@@ -146,8 +149,15 @@ export default function Calculator({ user }: CalculatorProps) {
       const isSunday = dayOfWeek === 0;
       const isSaturday = dayOfWeek === 6;
       
+      const isBlackout = installationBlackouts.some(b => 
+        isWithinInterval(currentDate, {
+          start: startOfDay(new Date(b.unavailableFrom)),
+          end: startOfDay(new Date(b.unavailableTo))
+        })
+      );
+
       let installSets = 0;
-      if (currentDate >= startOfDay(installationStartDate) && !isSunday) {
+      if (!isBlackout && currentDate >= startOfDay(installationStartDate) && !isSunday) {
         installSets = isSaturday ? defaultInstallSetRateSaturday : defaultInstallSetRate;
       }
 
@@ -164,7 +174,7 @@ export default function Calculator({ user }: CalculatorProps) {
       });
     }
     return ops;
-  }, [projectStartDate, projectEndDate, installationStartDate, defaultInstallSetRate, defaultInstallSetRateSaturday]);
+  }, [projectStartDate, projectEndDate, installationStartDate, defaultInstallSetRate, defaultInstallSetRateSaturday, installationBlackouts]);
 
   // Initialize or update dailyOperations when base changes
   useEffect(() => {
@@ -255,6 +265,7 @@ export default function Calculator({ user }: CalculatorProps) {
       target_6m_needed: target6mNeeded,
       production_plan_options: productionPlanOptions,
       production_restrictions: productionRestrictions,
+      installation_blackouts: installationBlackouts,
     };
 
     const { error } = await supabase.from('calculator_state').upsert(stateToSave);
@@ -391,6 +402,7 @@ export default function Calculator({ user }: CalculatorProps) {
                         </Card>
                         <ProductionPlanEditor productionPlanOptions={productionPlanOptions} setProductionPlanOptions={setProductionPlanOptions} />
                         <ProductionRestrictionEditor productionRestrictions={productionRestrictions} setProductionRestrictions={setProductionRestrictions} />
+                        <InstallationBlackoutEditor installationBlackouts={installationBlackouts} setInstallationBlackouts={setInstallationBlackouts} />
                     </div>
                 </ScrollArea>
             </ResizablePanel>
