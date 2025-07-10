@@ -299,6 +299,8 @@ export default function Calculator({ user }: CalculatorProps) {
         initialStock6m={initialStock6m}
         projectName={projectName}
         onBack={() => setIsPrinting(false)}
+        savedStateId={savedStateId}
+        supabase={supabase}
       />
     );
   }

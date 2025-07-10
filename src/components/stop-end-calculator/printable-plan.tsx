@@ -7,8 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Printer } from "lucide-react";
+import { ArrowLeft, Printer, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 interface PrintablePlanProps {
   dailyPlan: DailyOperation[];
@@ -17,6 +19,8 @@ interface PrintablePlanProps {
   initialStock6m: number;
   projectName: string;
   onBack: () => void;
+  savedStateId: string | null;
+  supabase: SupabaseClient;
 }
 
 export default function PrintablePlan({
@@ -26,6 +30,8 @@ export default function PrintablePlan({
   initialStock6m,
   projectName,
   onBack,
+  savedStateId,
+  supabase,
 }: PrintablePlanProps) {
   const [isCompact, setIsCompact] = useState(false);
   
@@ -47,6 +53,29 @@ export default function PrintablePlan({
     return "No Production";
   };
 
+  const handleShare = async () => {
+    if (!savedStateId) {
+      toast.error("Please save the project first", {
+        description: "A saved project is needed to create a shareable link.",
+      });
+      return;
+    }
+
+    const { error } = await supabase
+      .from('calculator_state')
+      .update({ is_public: true })
+      .eq('id', savedStateId);
+
+    if (error) {
+      toast.error("Could not make plan public", { description: error.message });
+      return;
+    }
+
+    const shareUrl = `${window.location.origin}/share/${savedStateId}`;
+    navigator.clipboard.writeText(shareUrl);
+    toast.success("Share link copied to clipboard!");
+  };
+
   return (
     <div className="p-4 sm:p-8">
       <div className="max-w-4xl mx-auto">
@@ -54,13 +83,18 @@ export default function PrintablePlan({
           <Button variant="outline" onClick={onBack}>
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to Calculator
           </Button>
-          <div className="flex items-center space-x-2">
-            <Switch id="compact-view" checked={isCompact} onCheckedChange={setIsCompact} />
-            <Label htmlFor="compact-view">Compact View</Label>
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+                <Switch id="compact-view" checked={isCompact} onCheckedChange={setIsCompact} />
+                <Label htmlFor="compact-view">Compact View</Label>
+            </div>
+            <Button onClick={handleShare} variant="outline">
+                <Share2 className="mr-2 h-4 w-4" /> Share
+            </Button>
+            <Button onClick={() => window.print()}>
+                <Printer className="mr-2 h-4 w-4" /> Print
+            </Button>
           </div>
-          <Button onClick={() => window.print()}>
-            <Printer className="mr-2 h-4 w-4" /> Print
-          </Button>
         </div>
         <div className="text-center mb-6">
             <h1 className="text-2xl font-bold print:text-xl">Production Plan: {projectName}</h1>
