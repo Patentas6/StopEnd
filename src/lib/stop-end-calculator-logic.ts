@@ -28,15 +28,17 @@ export function isProductionRestricted(
   return false;
 }
 
-// Helper to calculate actual sets installed based on requests and available stock (respecting the buffer)
+// Helper to calculate actual sets installed based on requests and available stock
 function calculateActualSetInstallations(
     requested10m: number,
     requested6m: number,
     stock10m: number,
-    stock6m: number
+    stock6m: number,
+    useBuffer: boolean = true
 ): { actualInstalled10m: number; actualInstalled6m: number; setsInstalled: number } {
-    const availableStock10m = Math.max(0, stock10m - STOCK_BUFFER);
-    const availableStock6m = Math.max(0, stock6m - STOCK_BUFFER);
+    const buffer = useBuffer ? STOCK_BUFFER : 0;
+    const availableStock10m = Math.max(0, stock10m - buffer);
+    const availableStock6m = Math.max(0, stock6m - buffer);
 
     const desiredSetsBasedOn10mRequest = requested10m;
     const desiredSetsBasedOn6mRequest = requested6m;
@@ -116,7 +118,8 @@ function runDetailedInternalSimulation(
       decisionDayOp.installed10m,
       decisionDayOp.installed6m,
       stock10mBeforeInstall_DD,
-      stock6mBeforeInstall_DD
+      stock6mBeforeInstall_DD,
+      true // For planning, always use the buffer
     );
 
   const immediateShortage10m = decisionDayOp.installed10m - actualInstalled10m_DD;
@@ -169,7 +172,8 @@ function runDetailedInternalSimulation(
                 futureDayOp.installed10m,
                 futureDayOp.installed6m,
                 stock10BeforeInstall_FD,
-                stock6BeforeInstall_FD
+                stock6BeforeInstall_FD,
+                true // For planning, always use the buffer
             );
 
         const short10ThisOpt = futureDayOp.installed10m - inst10mThisOpt;
@@ -215,7 +219,8 @@ function runDetailedInternalSimulation(
             futureDayOp.installed10m,
             futureDayOp.installed6m,
             currentSimStock10m,
-            currentSimStock6m
+            currentSimStock6m,
+            true // For planning, always use the buffer
         );
 
     const short10_FD = futureDayOp.installed10m - actualInstalled10m_FD;
@@ -448,9 +453,25 @@ export function calculateOptimalProductionPlan(
       }
 
       if (bestSimResult) {
-        decisionDay.produced10m = bestSimResult.decisionDayProduces10m;
-        decisionDay.produced6m = bestSimResult.decisionDayProduces6m;
-        decisionDay.chosenProductionPlanId = bestSimResult.decisionDayChosenPlanId;
+        let finalProd10m = bestSimResult.decisionDayProduces10m;
+        let finalProd6m = bestSimResult.decisionDayProduces6m;
+        let planId = bestSimResult.decisionDayChosenPlanId;
+
+        const remaining10mNeeded = Math.max(0, target10mNeeded - (initialStock10m + totalProduced10m));
+        const remaining6mNeeded = Math.max(0, target6mNeeded - (initialStock6m + totalProduced6m));
+
+        if (finalProd10m > 0 && finalProd10m > remaining10mNeeded) {
+            finalProd10m = remaining10mNeeded;
+            planId = undefined; // Custom production amount
+        }
+        if (finalProd6m > 0 && finalProd6m > remaining6mNeeded) {
+            finalProd6m = remaining6mNeeded;
+            planId = undefined; // Custom production amount
+        }
+
+        decisionDay.produced10m = finalProd10m;
+        decisionDay.produced6m = finalProd6m;
+        decisionDay.chosenProductionPlanId = planId;
       } else {
         decisionDay.produced10m = 0;
         decisionDay.produced6m = 0;
@@ -469,7 +490,8 @@ export function calculateOptimalProductionPlan(
             decisionDay.installed10m,
             decisionDay.installed6m,
             currentGlobalStock10m,
-            currentGlobalStock6m
+            currentGlobalStock6m,
+            false // Use real stock for global state update
         );
 
     currentGlobalStock10m -= actualInstalled10m_Global;
@@ -512,7 +534,8 @@ export function runFullSimulation(
             requestedInstall10m,
             requestedInstall6m,
             currentStock10m,
-            currentStock6m
+            currentStock6m,
+            false // Final simulation uses real stock, not buffered stock
         );
 
     currentStock10m -= actualInstalled10m;
